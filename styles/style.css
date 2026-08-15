@@ -6,3 +6,26 @@
     overflow: hidden;
 }
 
+
+.node{
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+img{
+    width: 90%;
+    height: 90%;
+}
+
+.node:hover{
+    background-color: aqua;
+}
+
+img:hover{
+    cursor: pointer;
+}
+
+.legal-move{
+    border: #7a20e16e 8px solid;
+}
