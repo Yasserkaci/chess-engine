@@ -98,11 +98,3 @@ Boardd.draw();
 
 
 
-
-sdufduofg
-'oUAGD'OUDG
-
-;Osugd;iwd
-
-;oUAGDOU;IDBCursor
-;OQWIUDG;AIDGI;D
