@@ -92,3 +92,17 @@ document.querySelectorAll('.node').forEach((node) => {
 });
 
 Boardd.draw();
+
+
+
+
+
+
+
+sdufduofg
+'oUAGD'OUDG
+
+;Osugd;iwd
+
+;oUAGDOU;IDBCursor
+;OQWIUDG;AIDGI;D
