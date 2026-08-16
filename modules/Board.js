@@ -36,72 +36,119 @@ export default function board(){
         }
         return moves
     }
-
-    this.getLegalMoves = function(first){
+this.getLegalMoves = function(first){
         const [r, c] = first
         const node = this.board[r][c]
         if (node === '') {return}
         const color = node[0]
         const type = node.slice(1)
         let moves = []
-        if(type === 'P'){
-            const dir = color ==='W'? -1 : 1 
-            console.log(color, type, [r, c])
-            const double = (color === 'W' && r === 6) || (color === 'B' && r === 1)
-            if (double && this.board[r + dir * 2][c] === ''){
-                moves.push([r+dir*2, c])
-            }
-            if(inBound(r + dir, c) && this.board[r + dir][c] === ''){
-                console.log('nigaa')
-                moves.push([r+dir, c])
-            }
-        }
-        if(type ==='R'){
-            const dir = [[1,0],[-1,0],[0,1],[0,-1]]
-            moves.push(...slide(r, c,dir, color))
-        }
-        if(type ==='B'){
-            const dir = [[1,1],[-1,1],[1,-1],[-1,-1]]
-            moves.push(...slide(r, c,dir, color))
-        }
-        if(type ==='Q'){
-            const dir = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]]
-            moves.push(...slide(r, c,dir, color))
-        }
 
-        if(type ==='KN'){
-            const dir = [[2,1],[-2,1],[2,-1],[-2,-1],[1,2],[-1,2],[1,-2],[-1,-2]]
-            for(const [dr, dc] of dir){
-            let r = first[0] + dr
-            let c = first[1] + dc
-            if(inBound(r,c)){
-                const target = this.board[r][c]
-                console.log(target[0])
-                if(target === ''){
-                    moves.push([r, c])
-                }else{
-                    if(target[0] !== color){
-                        moves.push([r, c])
+        if(type === 'P'){
+            const dir = color === 'W' ? -1 : 1 
+            const startRow = color === 'W' ? 6 : 1
+            const double = r === startRow
+
+            // Single step forward
+            if(inBound(r + dir, c) && this.board[r + dir][c] === ''){
+                moves.push([r + dir, c])
+                // Double step forward (only if single step is also empty)
+                if (double && this.board[r + dir * 2][c] === ''){
+                    moves.push([r + dir * 2, c])
+                }
+            }
+
+            // Diagonal captures & En Passant
+            const captureCols = [c - 1, c + 1]
+            for(const dc of captureCols){
+                const targetR = r + dir
+                const targetC = dc
+                if(inBound(targetR, targetC)){
+                    const target = this.board[targetR][targetC]
+                    // Standard diagonal capture
+                    if(target !== '' && target[0] !== color){
+                        moves.push([targetR, targetC])
+                    }
+                    // En Passant capture
+                    if(this.enPassantTarget && this.enPassantTarget[0] === targetR && this.enPassantTarget[1] === targetC){
+                        moves.push([targetR, targetC])
                     }
                 }
-            } 
+            }
         }
+
+        if(type === 'R'){
+            const dir = [[1,0],[-1,0],[0,1],[0,-1]]
+            moves.push(...slide(r, c, dir, color))
+        }
+
+        if(type === 'B'){
+            const dir = [[1,1],[-1,1],[1,-1],[-1,-1]]
+            moves.push(...slide(r, c, dir, color))
+        }
+
+        if(type === 'Q'){
+            const dir = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]]
+            moves.push(...slide(r, c, dir, color))
+        }
+
+        if(type === 'KN'){
+            const dir = [[2,1],[-2,1],[2,-1],[-2,-1],[1,2],[-1,2],[1,-2],[-1,-2]]
+            for(const [dr, dc] of dir){
+                let nr = first[0] + dr
+                let nc = first[1] + dc
+                if(inBound(nr, nc)){
+                    const target = this.board[nr][nc]
+                    if(target === '' || target[0] !== color){
+                        moves.push([nr, nc])
+                    }
+                } 
+            }
         }
 
         if(type === 'K'){            
             const dir = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]]
             for(const [dr, dc] of dir){
-                let r = first[0] + dr
-                let c = first[1] + dc
-                if(inBound(r , c) && this.board[r][c] === ''){
-                    console.log('nigaa')
-                    moves.push([r, c])
+                let nr = first[0] + dr
+                let nc = first[1] + dc
+                if(inBound(nr, nc)){
+                    const target = this.board[nr][nc]
+                    if(target === '' || target[0] !== color){
+                        moves.push([nr, nc])
+                    }
                 }
-        }
+            }
+
+            // Castling logic (assumes this.castlingRights tracks object/flags e.g., {W: {k: true, q: true}, B: {k: true, q: true}})
+            if(this.castlingRights && this.canCastle){
+                const row = color === 'W' ? 7 : 0
+                // Ensure king is in its starting position
+                if(r === row && c === 4){
+                    // Kingside castling
+                    if(this.castlingRights[color]?.k && 
+                       this.board[row][5] === '' && 
+                       this.board[row][6] === '' &&
+                       typeof this.isSquareUnderAttack === 'function' &&
+                       !this.isSquareUnderAttack([row, 4], color) &&
+                       !this.isSquareUnderAttack([row, 5], color) &&
+                       !this.isSquareUnderAttack([row, 6], color)){
+                        moves.push([row, 6])
+                    }
+                    // Queenside castling
+                    if(this.castlingRights[color]?.q && 
+                       this.board[row][3] === '' && 
+                       this.board[row][2] === '' && 
+                       this.board[row][1] === '' &&
+                       typeof this.isSquareUnderAttack === 'function' &&
+                       !this.isSquareUnderAttack([row, 4], color) &&
+                       !this.isSquareUnderAttack([row, 3], color) &&
+                       !this.isSquareUnderAttack([row, 2], color)){
+                        moves.push([row, 2])
+                    }
+                }
+            }
         }
 
-
-        console.log(moves)
         return moves
     }
 
