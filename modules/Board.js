@@ -42,7 +42,7 @@ this.getLegalMoves = function(first){
         if (node === '') {return}
         const color = node[0]
         const type = node.slice(1)
-        let moves = []
+        let pseudoMoves = []
 
         if(type === 'P'){
             const dir = color === 'W' ? -1 : 1 
@@ -51,10 +51,10 @@ this.getLegalMoves = function(first){
 
             // Single step forward
             if(inBound(r + dir, c) && this.board[r + dir][c] === ''){
-                moves.push([r + dir, c])
+                pseudoMoves.push([r + dir, c])
                 // Double step forward (only if single step is also empty)
                 if (double && this.board[r + dir * 2][c] === ''){
-                    moves.push([r + dir * 2, c])
+                    pseudoMoves.push([r + dir * 2, c])
                 }
             }
 
@@ -67,11 +67,11 @@ this.getLegalMoves = function(first){
                     const target = this.board[targetR][targetC]
                     // Standard diagonal capture
                     if(target !== '' && target[0] !== color){
-                        moves.push([targetR, targetC])
+                        pseudoMoves.push([targetR, targetC])
                     }
                     // En Passant capture
                     if(this.enPassantTarget && this.enPassantTarget[0] === targetR && this.enPassantTarget[1] === targetC){
-                        moves.push([targetR, targetC])
+                        pseudoMoves.push([targetR, targetC])
                     }
                 }
             }
@@ -79,17 +79,17 @@ this.getLegalMoves = function(first){
 
         if(type === 'R'){
             const dir = [[1,0],[-1,0],[0,1],[0,-1]]
-            moves.push(...slide(r, c, dir, color))
+            pseudoMoves.push(...slide(r, c, dir, color))
         }
 
         if(type === 'B'){
             const dir = [[1,1],[-1,1],[1,-1],[-1,-1]]
-            moves.push(...slide(r, c, dir, color))
+            pseudoMoves.push(...slide(r, c, dir, color))
         }
 
         if(type === 'Q'){
             const dir = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]]
-            moves.push(...slide(r, c, dir, color))
+            pseudoMoves.push(...slide(r, c, dir, color))
         }
 
         if(type === 'KN'){
@@ -100,7 +100,7 @@ this.getLegalMoves = function(first){
                 if(inBound(nr, nc)){
                     const target = this.board[nr][nc]
                     if(target === '' || target[0] !== color){
-                        moves.push([nr, nc])
+                        pseudoMoves.push([nr, nc])
                     }
                 } 
             }
@@ -114,42 +114,48 @@ this.getLegalMoves = function(first){
                 if(inBound(nr, nc)){
                     const target = this.board[nr][nc]
                     if(target === '' || target[0] !== color){
-                        moves.push([nr, nc])
+                        pseudoMoves.push([nr, nc])
                     }
                 }
             }
 
-            // Castling logic (assumes this.castlingRights tracks object/flags e.g., {W: {k: true, q: true}, B: {k: true, q: true}})
-            if(this.castlingRights && this.canCastle){
+            // Castling logic
+            if(this.castlingRights){
                 const row = color === 'W' ? 7 : 0
-                // Ensure king is in its starting position
                 if(r === row && c === 4){
-                    // Kingside castling
-                    if(this.castlingRights[color]?.k && 
-                       this.board[row][5] === '' && 
-                       this.board[row][6] === '' &&
-                       typeof this.isSquareUnderAttack === 'function' &&
-                       !this.isSquareUnderAttack([row, 4], color) &&
-                       !this.isSquareUnderAttack([row, 5], color) &&
-                       !this.isSquareUnderAttack([row, 6], color)){
-                        moves.push([row, 6])
-                    }
-                    // Queenside castling
-                    if(this.castlingRights[color]?.q && 
-                       this.board[row][3] === '' && 
-                       this.board[row][2] === '' && 
-                       this.board[row][1] === '' &&
-                       typeof this.isSquareUnderAttack === 'function' &&
-                       !this.isSquareUnderAttack([row, 4], color) &&
-                       !this.isSquareUnderAttack([row, 3], color) &&
-                       !this.isSquareUnderAttack([row, 2], color)){
-                        moves.push([row, 2])
+                    // Ensure king is not currently in check when trying to castle
+                    if(typeof this.isSquareUnderAttack === 'function' && !this.isSquareUnderAttack([row, 4], color)){
+                        // Kingside castling
+                        if(this.castlingRights[color]?.k && 
+                           this.board[row][5] === '' && 
+                           this.board[row][6] === '' &&
+                           !this.isSquareUnderAttack([row, 5], color) &&
+                           !this.isSquareUnderAttack([row, 6], color)){
+                            pseudoMoves.push([row, 6])
+                        }
+                        // Queenside castling
+                        if(this.castlingRights[color]?.q && 
+                           this.board[row][3] === '' && 
+                           this.board[row][2] === '' && 
+                           this.board[row][1] === '' &&
+                           !this.isSquareUnderAttack([row, 3], color) &&
+                           !this.isSquareUnderAttack([row, 2], color)){
+                            pseudoMoves.push([row, 2])
+                        }
                     }
                 }
             }
         }
 
-        return moves
+        // Filter pseudo-legal moves to ensure they don't leave/put the king in check
+        let legalMoves = []
+        for(const move of pseudoMoves){
+            if(this.simulatesMoveAndCheck(first, move, color)){
+                legalMoves.push(move)
+            }
+        }
+
+        return legalMoves
     }
 
 
