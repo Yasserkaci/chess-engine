@@ -288,7 +288,45 @@ export default function board(){
         this.board[tr][tc] = type
         this.draw()
     }
+    // Find coordinates of the given color's king
+    this.findKing = function(color) {
+        const kingSymbol = color + 'K';
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (this.board[r][c] === kingSymbol) {
+                    return [r, c];
+                }
+            }
+        }
+        return null;
+    };
 
+    // Check if a specific color's king is currently under attack
+    this.isInCheck = function(color) {
+        const kingPos = this.findKing(color);
+        if (!kingPos) return false;
+        return this.isSquareUnderAttack(kingPos, color);
+    };
+
+    // Check if the given color is checkmated
+    this.isCheckmate = function(color) {
+        // Must be in check first
+        if (!this.isInCheck(color)) return false;
+
+        // Check if ANY piece of this color has at least one legal move
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = this.board[r][c];
+                if (piece !== '' && piece[0] === color) {
+                    const legalMoves = this.getLegalMoves([r, c]);
+                    if (legalMoves.length > 0) {
+                        return false; // Found a valid move, not checkmate
+                    }
+                }
+            }
+        }
+        return true; // In check and 0 legal moves available
+    };
     this.draw = function(){
         for(let j = 0; j < this.board.length; j++){
             for (let i = 0; i < this.board.length; i++){
