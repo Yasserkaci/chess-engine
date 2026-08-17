@@ -41,9 +41,42 @@ const clearHilight = () => {
     });
 };
 
+// Clear check highlights from previous turns
+const clearCheckHighlights = () => {
+    document.querySelectorAll('.in-check').forEach((el) => {
+        el.classList.remove('in-check');
+    });
+};
+
+// Highlight the king in red if under check
+const updateCheckStatus = () => {
+    clearCheckHighlights();
+    // Assumes Boardd has a method like findKing(turn) returning [row, col]
+    if (typeof Boardd.findKing === 'function' && typeof Boardd.isInCheck === 'function') {
+        if (Boardd.isInCheck(turn)) {
+            const kingPos = Boardd.findKing(turn);
+            if (kingPos) {
+                const kingNode = document.querySelector(`[data-row='${kingPos[0]}'][data-col='${kingPos[1]}']`);
+                if (kingNode) kingNode.classList.add('in-check');
+            }
+        }
+    }
+};
+
+// Show Checkmate / Win Banner
+const showGameOverBanner = (winner) => {
+    let banner = document.querySelector('.game-over-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.classList.add('game-over-banner');
+        document.body.appendChild(banner);
+    }
+    banner.textContent = `Checkmate! ${winner === 'W' ? 'White' : 'Black'} Wins!`;
+    banner.style.display = 'block';
+};
+
 // Helper function to handle selecting a piece and highlighting its moves
 const selectPiece = (r, c) => {
-    // Check if the square is empty or belongs to the opponent
     if (Boardd.board[r][c] === '' || Boardd.board[r][c][0] !== turn) {
         start = null;
         clearHilight();
@@ -62,24 +95,37 @@ const selectPiece = (r, c) => {
     return true;
 };
 
-// 2. Attach click listeners to all nodes using correct row/col attributes
+// 2. Attach click listeners to all nodes
 document.querySelectorAll('.node').forEach((node) => {
     node.addEventListener('click', (e) => {
+        // Stop gameplay if checkmate condition is met
+        if (typeof Boardd.isCheckmate === 'function' && Boardd.isCheckmate(turn)) return;
+
         const r = Number(e.currentTarget.dataset.row);
         const c = Number(e.currentTarget.dataset.col);
 
         if (start === null) {
-            // No piece selected yet; try selecting this one
             selectPiece(r, c);
         } else {
-            // Piece already selected; check if click is a legal move destination
             if (isLegal(r, c)) {
                 Boardd.move(start, [r, c]);
+                
+                // Switch turn
                 turn = turn === 'W' ? 'B' : 'W';
                 start = null;
                 clearHilight();
+
+                // Redraw board elements if your module supports it
+                if (typeof Boardd.draw === 'function') Boardd.draw();
+
+                // Check for check status or checkmate after the move
+                updateCheckStatus();
+
+                if (typeof Boardd.isCheckmate === 'function' && Boardd.isCheckmate(turn)) {
+                    const winner = turn === 'W' ? 'B' : 'W';
+                    showGameOverBanner(winner);
+                }
             } else {
-                // Clicked an illegal destination; treat it as trying to select a new piece instead
                 const selectedSuccessfully = selectPiece(r, c);
                 if (!selectedSuccessfully) {
                     start = null;
@@ -87,14 +133,8 @@ document.querySelectorAll('.node').forEach((node) => {
                 }
             }
         }
-        console.log("Current start:", start, "Turn:", turn);
     });
 });
 
 Boardd.draw();
-
-
-
-
-
-
+updateCheckStatus();

@@ -10,36 +10,85 @@ export default function board(){
         ['WR','WKN','WB','WQ','WK','WB','WKN','WR'],
     ];
 
+    this.castlingRights = {
+        W: { k: true, q: true },
+        B: { k: true, q: true }
+    };
+    this.enPassantTarget = null; // Stores [row, col] of the target square
+
     const inBound = (r, c) => r > -1 && r < 8 && c > -1 && c < 8 
 
-
-    const slide = (row, col, directions, color) =>{
+    const slide = (row, col, directions, color) => {
         let moves = []
         for(const [dr, dc] of directions){
             let r = row + dr
             let c = col + dc
-            while(inBound(r,c)){
+            while(inBound(r, c)){
                 const target = this.board[r][c]
-                console.log(target[0])
                 if(target === ''){
                     moves.push([r, c])
-                }else{
+                } else {
                     if(target[0] !== color){
                         moves.push([r, c])
                         break
-                    }else{break}
+                    } else {
+                        break
+                    }
                 }
                 r += dr
                 c += dc
-
             } 
         }
         return moves
     }
-this.getLegalMoves = function(first){
+
+    this.isSquareUnderAttack = function(square, defenderColor){
+        const [targetR, targetC] = square
+        const attackerColor = defenderColor === 'W' ? 'B' : 'W'
+
+        for(let r = 0; r < 8; r++){
+            for(let c = 0; c < 8; c++){
+                const piece = this.board[r][c]
+                if(piece !== '' && piece[0] === attackerColor){
+                    const type = piece.slice(1)
+                    let attacks = []
+
+                    if(type === 'P'){
+                        const dir = attackerColor === 'W' ? -1 : 1
+                        if(r + dir === targetR && (c - 1 === targetC || c + 1 === targetC)){
+                            return true
+                        }
+                    } else if(type === 'R'){
+                        attacks = slide(r, c, [[1,0],[-1,0],[0,1],[0,-1]], attackerColor)
+                    } else if(type === 'B'){
+                        attacks = slide(r, c, [[1,1],[-1,1],[1,-1],[-1,-1]], attackerColor)
+                    } else if(type === 'Q'){
+                        attacks = slide(r, c, [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]], attackerColor)
+                    } else if(type === 'KN'){
+                        const dir = [[2,1],[-2,1],[2,-1],[-2,-1],[1,2],[-1,2],[1,-2],[-1,-2]]
+                        for(const [dr, dc] of dir){
+                            if(r + dr === targetR && c + dc === targetC) return true
+                        }
+                    } else if(type === 'K'){
+                        const dir = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]]
+                        for(const [dr, dc] of dir){
+                            if(r + dr === targetR && c + dc === targetC) return true
+                        }
+                    }
+
+                    for(const move of attacks){
+                        if(move[0] === targetR && move[1] === targetC) return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    this.getLegalMoves = function(first){
         const [r, c] = first
         const node = this.board[r][c]
-        if (node === '') {return}
+        if (node === '') {return []}
         const color = node[0]
         const type = node.slice(1)
         let pseudoMoves = []
@@ -49,27 +98,22 @@ this.getLegalMoves = function(first){
             const startRow = color === 'W' ? 6 : 1
             const double = r === startRow
 
-            // Single step forward
             if(inBound(r + dir, c) && this.board[r + dir][c] === ''){
                 pseudoMoves.push([r + dir, c])
-                // Double step forward (only if single step is also empty)
                 if (double && this.board[r + dir * 2][c] === ''){
                     pseudoMoves.push([r + dir * 2, c])
                 }
             }
 
-            // Diagonal captures & En Passant
             const captureCols = [c - 1, c + 1]
             for(const dc of captureCols){
                 const targetR = r + dir
                 const targetC = dc
                 if(inBound(targetR, targetC)){
                     const target = this.board[targetR][targetC]
-                    // Standard diagonal capture
                     if(target !== '' && target[0] !== color){
                         pseudoMoves.push([targetR, targetC])
                     }
-                    // En Passant capture
                     if(this.enPassantTarget && this.enPassantTarget[0] === targetR && this.enPassantTarget[1] === targetC){
                         pseudoMoves.push([targetR, targetC])
                     }
@@ -119,13 +163,10 @@ this.getLegalMoves = function(first){
                 }
             }
 
-            // Castling logic
             if(this.castlingRights){
                 const row = color === 'W' ? 7 : 0
                 if(r === row && c === 4){
-                    // Ensure king is not currently in check when trying to castle
-                    if(typeof this.isSquareUnderAttack === 'function' && !this.isSquareUnderAttack([row, 4], color)){
-                        // Kingside castling
+                    if(!this.isSquareUnderAttack([row, 4], color)){
                         if(this.castlingRights[color]?.k && 
                            this.board[row][5] === '' && 
                            this.board[row][6] === '' &&
@@ -133,7 +174,6 @@ this.getLegalMoves = function(first){
                            !this.isSquareUnderAttack([row, 6], color)){
                             pseudoMoves.push([row, 6])
                         }
-                        // Queenside castling
                         if(this.castlingRights[color]?.q && 
                            this.board[row][3] === '' && 
                            this.board[row][2] === '' && 
@@ -147,7 +187,6 @@ this.getLegalMoves = function(first){
             }
         }
 
-        // Filter pseudo-legal moves to ensure they don't leave/put the king in check
         let legalMoves = []
         for(const move of pseudoMoves){
             if(this.simulatesMoveAndCheck(first, move, color)){
@@ -158,32 +197,109 @@ this.getLegalMoves = function(first){
         return legalMoves
     }
 
-
-    this.move = function(start,end){
-        console.log(start)
-        const type = this.board[start[0]][ start[1]]
-        console.log('type:', type)
-        const node = document.querySelector(`[data-row='${start[0]}'][data-col='${start[1]}']`)
-        console.log(node)
-        this.board[start[0]][ start[1]] = ''
-        console.log(this.board[start[0]][ start[1]])
+    this.simulatesMoveAndCheck = function(from, to, color){
+        const [fr, fc] = from
+        const [tr, tc] = to
         
-        
-        this.board[end[0]][ end[1]] = type
-        this.draw()
+        const targetBackup = this.board[tr][tc]
+        const pieceBackup = this.board[fr][fc]
 
+        let epCapturedCoord = null
+        let epCapturedBackup = null
+        if(pieceBackup.slice(1) === 'P' && fc !== tc && targetBackup === ''){
+            epCapturedCoord = [fr, tc]
+            epCapturedBackup = this.board[fr][tc]
+            this.board[fr][tc] = ''
+        }
+
+        this.board[tr][tc] = pieceBackup
+        this.board[fr][fc] = ''
+
+        let kingPos = null
+        const kingSymbol = color + 'K'
+        for(let r = 0; r < 8; r++){
+            for(let c = 0; c < 8; c++){
+                if(this.board[r][c] === kingSymbol){
+                    kingPos = [r, c]
+                    break
+                }
+            }
+            if(kingPos) break
+        }
+
+        let isSafe = true
+        if(kingPos){
+            isSafe = !this.isSquareUnderAttack(kingPos, color)
+        }
+
+        this.board[fr][fc] = pieceBackup
+        this.board[tr][tc] = targetBackup
+        if(epCapturedCoord){
+            this.board[epCapturedCoord[0]][epCapturedCoord[1]] = epCapturedBackup
+        }
+
+        return isSafe
     }
 
+    this.move = function(start, end){
+        const [fr, fc] = start
+        const [tr, tc] = end
+        const type = this.board[fr][fc]
+        const color = type[0]
+
+        // Handle En Passant updates
+        if(type.slice(1) === 'P' && fc !== tc && this.board[tr][tc] === ''){
+            this.board[fr][tc] = '' // Remove captured pawn behind
+        }
+
+        // Handle En Passant target setting
+        if(type.slice(1) === 'P' && Math.abs(tr - fr) === 2){
+            this.enPassantTarget = [(fr + tr) / 2, fc]
+        } else {
+            this.enPassantTarget = null
+        }
+
+        // Handle Castling Rook movement
+        if(type.slice(1) === 'K' && Math.abs(tc - fc) === 2){
+            if(tc === 6){ // Kingside
+                const rook = this.board[tr][7]
+                this.board[tr][7] = ''
+                this.board[tr][5] = rook
+            } else if(tc === 2){ // Queenside
+                const rook = this.board[tr][0]
+                this.board[tr][0] = ''
+                this.board[tr][3] = rook
+            }
+        }
+
+        // Update castling rights if King or Rook moves
+        if(type.slice(1) === 'K'){
+            this.castlingRights[color].k = false
+            this.castlingRights[color].q = false
+        }
+        if(type.slice(1) === 'R'){
+            if(fr === 7 && fc === 0) this.castlingRights.W.q = false
+            if(fr === 7 && fc === 7) this.castlingRights.W.k = false
+            if(fr === 0 && fc === 0) this.castlingRights.B.q = false
+            if(fr === 0 && fc === 7) this.castlingRights.B.k = false
+        }
+
+        this.board[fr][fc] = ''
+        this.board[tr][tc] = type
+        this.draw()
+    }
 
     this.draw = function(){
         for(let j = 0; j < this.board.length; j++){
-            for (let i = 0; i< this.board.length ; i++){
+            for (let i = 0; i < this.board.length; i++){
                 const node = document.querySelector(`[data-row='${j}'][data-col='${i}']`)
-                node.innerHTML = ''
-                if(this.board[j][i] !== ''){
-                    const img = document.createElement('img')
-                img.src = `./styles/images/${this.board[j][i]}.svg`
-                node.appendChild(img)
+                if(node){
+                    node.innerHTML = ''
+                    if(this.board[j][i] !== ''){
+                        const img = document.createElement('img')
+                        img.src = `./styles/images/${this.board[j][i]}.svg`
+                        node.appendChild(img)
+                    }
                 }
             }
         }
